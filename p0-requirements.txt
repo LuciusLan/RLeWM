@@ -1,0 +1,8 @@
+# P0 dependencies; successful runtime versions are recorded in smoke-report.json.
+# The existing CUDA-enabled torch/torchvision installations satisfy these projects.
+torch==2.14.1+cu132
+torchvision==0.29.1+cu132
+stable-worldmodel[train]
+stable-pretraining
+h5py
+hdf5plugin

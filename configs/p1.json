@@ -1,0 +1,18 @@
+{
+  "extends": "p1-pilot.json",
+  "paths": {
+    "experiment_dir": "artifacts/p1-full",
+    "cache_dir": "/opt/dlami/nvme/ubuntu/lewm_tta/p1-full/cache"
+  },
+  "data": {
+    "memory_windows": "all",
+    "split_from": "artifacts/p1/manifest.json"
+  },
+  "cache": {
+    "checkpoint_rows": 8192
+  },
+  "retrieval": {
+    "max_windows_per_episode": 4,
+    "min_start_step_gap": 20
+  }
+}

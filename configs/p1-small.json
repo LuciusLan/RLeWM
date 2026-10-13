@@ -1,0 +1,18 @@
+{
+  "extends": "p1-pilot.json",
+  "paths": {
+    "experiment_dir": "artifacts/p1-small",
+    "cache_dir": "/opt/dlami/nvme/ubuntu/lewm_tta/p1-small/cache"
+  },
+  "data": {
+    "memory_windows": 512,
+    "validation_episodes": 8,
+    "test_episodes": 8,
+    "windows_per_query_episode": 2
+  },
+  "evaluation": {
+    "seeds": [42],
+    "bootstrap_samples": 1000,
+    "log_every": 4
+  }
+}
