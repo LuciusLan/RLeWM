@@ -9,7 +9,7 @@ import torch
 from .adaptation import AdaptationEngine
 from .cache import LatentBank
 from .model import Context
-from .rank_diagnostics import consensus_indices, cross_rank_diagnostics
+from .rank_diagnostics import consensus_indices, cross_rank_diagnostics, exact_distance_rank, summarize_saved_topk
 from .retrieval import ExactRetriever, Ranking, diverse_prefix, select_support
 
 
@@ -41,8 +41,36 @@ def run_checks(engine: AdaptationEngine, queries, seed: int) -> dict:
     fixtures = cross_rank_diagnostics([0, 1, 2, 3], [2, 0, 1, 3], k=2)
     assert fixtures["forward_top1_reverse_rank"] == 2
     assert fixtures["reverse_top1_forward_rank"] == 3
-    assert fixtures["overlap_fraction"] == .5
-    assert consensus_indices([0, 1, 2, 3], [2, 0, 1, 3], 2, 2) == [0, 2]
+    assert fixtures["supplementary_topk"]["overlap_fraction"] == .5
+    assert fixtures["forward_top1"]["transition_id"] == 0
+    assert fixtures["forward_top1"]["opposite_rank"] == 2
+    assert consensus_indices([0, 1, 2, 3], [2, 0, 1, 3], 2) == [0, 2]
+    # Opposite winners can be well outside both shortlists. Their ranks remain
+    # exact, and global consensus can select a transition outside both pools.
+    distant = cross_rank_diagnostics(list(range(8)), list(reversed(range(8))), k=2)
+    assert distant["forward_top1_reverse_rank"] == distant["reverse_top1_forward_rank"] == 8
+    assert distant["mean_top1_log2_opposite_rank"] == 3
+    assert distant["supplementary_topk"]["overlap_fraction"] == 0
+    assert distant["topk_cross_ranks"]["forward"]["mean_opposite_rank"] == 7.5
+    assert distant["topk_cross_ranks"]["reverse"]["opposite_topk_fraction"] == 0
+    assert distant["forward_candidates_exact_cross_ranks"][1]["opposite_rank"] == 7
+    assert distant["forward_candidates_exact_cross_ranks"][1]["own_rank"] == 2
+    assert summarize_saved_topk(distant, 1)["mean_bidirectional_absolute_log2_rank_ratio"] == 3
+    try:
+        summarize_saved_topk(distant, 3)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Archived analysis cannot invent missing top-k neighbors")
+    assert consensus_indices(list(range(8)), list(reversed(range(8))), 2) == [3, 4]
+    tied = torch.tensor([1., 1., 0., 2.])
+    assert [exact_distance_rank(tied, index) for index in range(4)] == [2, 3, 1, 4]
+    global_support = select_support("rank-consensus", 2, 2, .5,
+        Ranking(np.arange(8), torch.arange(8).float(), {}),
+        Ranking(np.arange(7, -1, -1), torch.arange(7, -1, -1).float(), {}),
+        torch.Generator().manual_seed(42))
+    assert global_support.indices == [3, 4]
+    assert global_support.details["scored_memory_windows"] == 8
     tiny = LatentBank("memory", torch.zeros(4, 1, 1), torch.zeros(4, 0, 1),
                       torch.arange(4).float().unsqueeze(1), torch.tensor([[2.], [0.], [1.], [3.]]),
                       [{"transition_id": str(index)} for index in range(4)], {})
@@ -51,6 +79,31 @@ def run_checks(engine: AdaptationEngine, queries, seed: int) -> dict:
     context = Context(torch.zeros(1, 1, 1), torch.zeros(1, 0, 1))
     assert exact.forward(context, torch.zeros(1, 1)).indices.tolist() == [0, 1, 2, 3]
     assert exact.reverse(context, torch.zeros(1, 1)).indices.tolist() == [1, 2, 0, 3]
+    exact.settings["pool_size"] = 2
+    diagnostic = exact.diagnostics(exact.forward(context, torch.zeros(1, 1)),
+                                   exact.reverse(context, torch.zeros(1, 1)))
+    assert diagnostic["forward_top1_reverse_rank"] == 3
+    assert diagnostic["reverse_top1_forward_rank"] == 2
+    assert diagnostic["forward_top1"]["transition_id"] == "0"
+    assert diagnostic["forward_candidates_exact_cross_ranks"][0]["reverse_rank"] == 3
+    assert diagnostic["reverse_candidates_exact_cross_ranks"][0]["forward_rank"] == 2
+    assert diagnostic["topk_cross_ranks"]["forward"]["mean_opposite_rank"] == 2
+    # Diagnostic list length is independent of the support budget/diversity.
+    capped_bank = LatentBank(tiny.split, tiny.contexts, tiny.past_actions, tiny.actions, tiny.successors,
+        [{"transition_id": str(index), "source_episode_position": 0, "start_in_episode": index}
+         for index in range(len(tiny))], {})
+    capped = ExactRetriever(capped_bank, {"scales": exact.scales}, exact.settings | {
+        "diagnostic_topk": 3, "diagnostic_selection": "raw", "max_windows_per_episode": 1,
+        "min_start_step_gap": 20})
+    capped_diagnostic = capped.diagnostics(capped.forward(context, torch.zeros(1, 1)),
+                                         capped.reverse(context, torch.zeros(1, 1)))
+    assert capped_diagnostic["topk_cross_ranks"]["forward"]["count"] == 3
+    assert [row["own_rank"] for row in capped_diagnostic["forward_candidates_exact_cross_ranks"]] == [1, 2, 3]
+    capped.settings["diagnostic_selection"] = "support"
+    filtered = capped.diagnostics(capped.forward(context, torch.zeros(1, 1)),
+                                 capped.reverse(context, torch.zeros(1, 1)))
+    assert filtered["topk_cross_ranks"]["forward"]["count"] == 1
+    assert filtered["topk_cross_ranks"]["forward"]["shortfall"] == 2
     episodes = np.array([0, 0, 0, 0, 1, 1, 1, 1])
     steps = np.array([0, 1, 20, 21, 0, 1, 20, 21])
     forward_fixture = Ranking(np.arange(8), torch.zeros(8), {})
@@ -71,9 +124,15 @@ def run_checks(engine: AdaptationEngine, queries, seed: int) -> dict:
     torch.testing.assert_close(torch.tensor(frozen["prediction_final"]),
                                torch.tensor(unadapted["prediction_final"]), rtol=0, atol=0)
     checks = {"exact_rank_fixture": True, "exact_search_fixture": True, "zero_update_equivalence": True,
+              "exact_cross_ranks_outside_topk": True, "stable_rank_ties": True,
+              "global_consensus_outside_topk_union": True,
+              "topk_exact_cross_rank_statistics": True, "diagnostic_k_independent_of_support": True,
               "support_episode_cap_and_step_spacing": True,
               "reverse_signature_has_no_candidate_action": True,
               "query_type_has_no_successor_label": not hasattr(query, "successor")}
+    if engine.retriever.settings.get("backend", "torch") == "cuvs":
+        from .cuvs_retrieval import check_cuvs_backend
+        checks["cuvs_backend"] = check_cuvs_backend(engine.adapter.device)
     if hasattr(queries, "store"):
         checks.update(check_frame_bank_layout())
     if len(engine.memory):

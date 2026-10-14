@@ -72,10 +72,27 @@ def validate_config(config: dict) -> None:
         raise ValueError("Invalid channel mixture, parameter anchor, or clipping norm")
     if retrieval["pool_size"] < adaptation["support_size"]:
         raise ValueError("Retrieval pool_size must cover the support budget")
+    rank_k = retrieval.get("diagnostic_topk", retrieval["pool_size"])
+    if isinstance(rank_k, bool) or not isinstance(rank_k, int) or rank_k < 1:
+        raise ValueError("retrieval.diagnostic_topk must be a positive integer")
+    if retrieval.get("diagnostic_selection", "raw") not in ("raw", "support"):
+        raise ValueError("retrieval.diagnostic_selection must be 'raw' or 'support'")
     if min(retrieval["beta_action"], retrieval["beta_successor"]) < 0 or retrieval["distance_floor"] <= 0:
         raise ValueError("Invalid distance coefficients or floor")
     if min(retrieval["calibration_pairs"], retrieval["chunk_size"]) < 1:
         raise ValueError("Calibration and search batch sizes must be positive")
+    if retrieval.get("backend", "torch") not in ("torch", "cuvs"):
+        raise ValueError("retrieval.backend must be 'torch' or 'cuvs'")
+    if retrieval.get("backend", "torch") == "cuvs":
+        for key, default in (("initial_search_k", 256), ("max_search_k", 2048),
+                             ("index_batch_rows", 8192), ("index_checkpoint_rows", 131072)):
+            if not isinstance(retrieval.get(key, default), int) or retrieval.get(key, default) < 1:
+                raise ValueError(f"retrieval.{key} must be a positive integer")
+        if retrieval.get("initial_search_k", 256) > retrieval.get("max_search_k", 2048):
+            raise ValueError("initial_search_k cannot exceed max_search_k")
+        reserve = retrieval.get("device_reserve_gib", 2)
+        if not isinstance(reserve, (int, float)) or not 0 <= reserve < float("inf"):
+            raise ValueError("retrieval.device_reserve_gib must be finite and nonnegative")
     cap = retrieval.get("max_windows_per_episode")
     if cap is not None and (not isinstance(cap, int) or cap < 1):
         raise ValueError("retrieval.max_windows_per_episode must be positive or null")

@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import math
-from statistics import mean, median
 
 import numpy as np
 
@@ -12,6 +10,7 @@ import torch
 
 from .cache import LatentBank
 from .model import Context
+from .rank_diagnostics import candidate_cross_ranks, top1_cross_rank_summary, topk_cross_rank_summary
 
 
 @dataclass
@@ -20,6 +19,16 @@ class Ranking:
     distances: torch.Tensor               # indexed by memory row, not rank
     components: dict[str, torch.Tensor]    # raw component MSE
     _ranks: np.ndarray | None = None
+
+    def __len__(self):
+        return len(self.indices)
+
+    @property
+    def order(self):
+        return self.indices
+
+    def rank_of(self, index: int) -> int:
+        return int(self.ranks[index])
 
     @property
     def ranks(self):
@@ -113,38 +122,53 @@ class ExactRetriever:
         return self._rank(components, "successor", self.settings["beta_successor"])
 
     def diagnostics(self, forward: Ranking, reverse: Ranking) -> dict:
-        size = len(forward.indices)
+        size = len(forward)
         if not size:
             return {"memory_size": 0, "k": 0, "rows": [], "reason": "empty_memory"}
-        k = min(self.settings["pool_size"], self.max_support)
-        top_f = diverse_prefix(forward.indices, k, self.episode_positions, self.episode_cap,
-                               self.step_positions, self.min_step_gap)
-        top_r = diverse_prefix(reverse.indices, k, self.episode_positions, self.episode_cap,
-                               self.step_positions, self.min_step_gap)
+        requested_k = self.settings.get("diagnostic_topk", self.settings["pool_size"])
+        k = min(requested_k, size)
+        if self.settings.get("diagnostic_selection", "raw") == "raw":
+            top_f = [int(index) for index in forward.order[:k]]
+            top_r = [int(index) for index in reverse.order[:k]]
+            selection_rule = "raw_directional_topk"
+        else:
+            k = min(k, self.max_support)
+            top_f = diverse_prefix(forward.order, k, self.episode_positions, self.episode_cap,
+                                   self.step_positions, self.min_step_gap)
+            top_r = diverse_prefix(reverse.order, k, self.episode_positions, self.episode_cap,
+                                   self.step_positions, self.min_step_gap)
+            selection_rule = "directional prefixes respecting support episode and step limits"
         k = min(k, len(top_f), len(top_r))
         top_f, top_r = top_f[:k], top_r[:k]
-        candidates = list(dict.fromkeys(top_f + top_r))
-        rows = []
-        for index in candidates:
-            rf, rr = int(forward.ranks[index]), int(reverse.ranks[index])
-            signed = math.log2(rr / rf)
-            item = self.memory.items[index]
-            rows.append({"transition_id": item["transition_id"],
-                "episode_id": item.get("episode_id"), "start_in_episode": item.get("start_in_episode"),
-                "forward_rank": rf, "reverse_rank": rr, "signed_log2_rank_ratio": signed,
-                "absolute_log2_rank_gap": abs(signed), "worst_rank": max(rf, rr),
-                **self.describe(index, forward, reverse)})
+        forward_index, reverse_index = int(forward.order[0]), int(reverse.order[0])
+        forward_row = {**self.memory.items[forward_index], "forward_rank": 1,
+            "reverse_rank": reverse.rank_of(forward_index),
+            **self.describe(forward_index, forward, reverse)}
+        reverse_row = {**self.memory.items[reverse_index],
+            "forward_rank": forward.rank_of(reverse_index), "reverse_rank": 1,
+            **self.describe(reverse_index, forward, reverse)}
+        result = top1_cross_rank_summary(forward_row, reverse_row, size)
+        result["rank_scope"] = "complete identical memory; ties by memory row"
+        # Keep directional candidate lists separate. Every opposite rank is
+        # looked up in the complete ordering, including ranks far beyond k.
+        def candidate_row(index):
+            return {**self.memory.items[index], "forward_rank": forward.rank_of(index),
+                    "reverse_rank": reverse.rank_of(index),
+                    **self.describe(index, forward, reverse)}
+        result["forward_candidates_exact_cross_ranks"] = candidate_cross_ranks(
+            [candidate_row(index) for index in top_f], "forward", size, requested_k)
+        result["reverse_candidates_exact_cross_ranks"] = candidate_cross_ranks(
+            [candidate_row(index) for index in top_r], "reverse", size, requested_k)
+        result["topk_cross_ranks"] = topk_cross_rank_summary(result["forward_candidates_exact_cross_ranks"],
+            result["reverse_candidates_exact_cross_ranks"], size, requested_k, selection_rule)
         sf, sr = set(top_f), set(top_r)
-        return {"memory_size": size, "k": k, "topk_episode_cap": self.episode_cap,
-            "min_start_step_gap": self.min_step_gap,
-            "rank_scope": "all memory windows; top-k pools obey episode/step constraints",
+        result["supplementary_topk"] = {"k": k,
+            "episode_cap": self.episode_cap if selection_rule != "raw_directional_topk" else None,
+            "min_start_step_gap": self.min_step_gap if selection_rule != "raw_directional_topk" else 0,
+            "selection_rule": selection_rule,
             "overlap_fraction": len(sf & sr)/k,
-            "jaccard": len(sf & sr)/len(sf | sr),
-            "forward_top1_reverse_rank": int(reverse.ranks[top_f[0]]),
-            "reverse_top1_forward_rank": int(forward.ranks[top_r[0]]),
-            "median_reverse_rank_of_forward_topk": float(median(reverse.ranks[index] for index in top_f)),
-            "median_forward_rank_of_reverse_topk": float(median(forward.ranks[index] for index in top_r)),
-            "mean_absolute_log2_rank_gap": mean(row["absolute_log2_rank_gap"] for row in rows), "rows": rows}
+            "jaccard": len(sf & sr)/len(sf | sr)}
+        return result
 
     def describe(self, index: int, forward: Ranking, reverse: Ranking) -> dict:
         return {"forward_distance": float(forward.distances[index]),
@@ -182,41 +206,48 @@ def select_support(method: str, budget: int, pool_size: int, alpha: float,
                    state: Ranking | None = None, episode_positions=None,
                    max_per_episode: int | None = None, max_support: int | None = None,
                    step_positions=None, min_step_gap: int = 0) -> Support:
-    size = min(budget, len(forward.indices))
+    size = min(budget, len(forward))
     if max_support is not None:
         size = min(size, max_support)
     if size == 0:
         return Support([], [], {})
     if method == "uniform":
-        order = torch.randperm(len(forward.indices), generator=generator).numpy()
+        order = torch.randperm(len(forward), generator=generator).numpy()
         selected = diverse_prefix(order, size, episode_positions, max_per_episode, step_positions, min_step_gap)
     elif method == "state":
-        selected = diverse_prefix(state.indices, size, episode_positions, max_per_episode, step_positions, min_step_gap)
+        selected = diverse_prefix(state.order, size, episode_positions, max_per_episode, step_positions, min_step_gap)
     elif method == "forward" or (method.startswith("fr-") and alpha == 0):
-        selected = diverse_prefix(forward.indices, size, episode_positions, max_per_episode, step_positions, min_step_gap)
+        selected = diverse_prefix(forward.order, size, episode_positions, max_per_episode, step_positions, min_step_gap)
     elif method == "reverse" or (method.startswith("fr-") and alpha == 1):
-        selected = diverse_prefix(reverse.indices, size, episode_positions, max_per_episode, step_positions, min_step_gap)
+        selected = diverse_prefix(reverse.order, size, episode_positions, max_per_episode, step_positions, min_step_gap)
     elif method == "rank-consensus":
-        count = min(pool_size, max_support if max_support is not None else len(forward.indices))
+        # All transitions receive the minimax score, including candidates
+        # outside both top-k pools. Partial sorting is only a work reduction;
+        # including every boundary tie preserves the complete global order.
+        worst = np.maximum(forward.ranks, reverse.ranks)
+        rank_sum = forward.ranks + reverse.ranks
+        limit = len(worst)
+        count = min(max(pool_size, size), limit)
         starting_count = count
+        expansions = 0
         while True:
-            candidates = set(diverse_prefix(forward.indices, count, episode_positions, max_per_episode,
-                                           step_positions, min_step_gap))
-            candidates |= set(diverse_prefix(reverse.indices, count, episode_positions, max_per_episode,
-                                            step_positions, min_step_gap))
-            ordered = sorted(candidates, key=lambda index: (max(forward.ranks[index], reverse.ranks[index]),
-                             forward.ranks[index] + reverse.ranks[index], index))
+            boundary = int(np.partition(worst, count-1)[count-1])
+            candidates = np.flatnonzero(worst <= boundary)
+            order = np.lexsort((candidates, rank_sum[candidates], worst[candidates]))
+            ordered = candidates[order]
             selected = diverse_prefix(ordered, size, episode_positions, max_per_episode, step_positions, min_step_gap)
-            limit = max_support if max_support is not None else len(forward.indices)
             if len(selected) >= size or count >= limit:
                 break
             count = min(count*2, limit)
+            expansions += 1
         return Support(selected, [1/len(selected)]*len(selected), {index: [method] for index in selected},
-                       {"initial_pool_size": starting_count, "effective_pool_size": count,
-                        "expanded_for_episode_spacing": count != starting_count})
+                       {"rank_scope": "complete_memory", "scored_memory_windows": limit,
+                        "initial_working_prefix_size": starting_count,
+                        "working_prefix_candidates": len(candidates), "boundary_worst_rank": boundary,
+                        "prefix_expansions": expansions})
     elif method.startswith("fr-"):
         if size == 1:
-            chosen = int(forward.indices[0])
+            chosen = int(forward.order[0])
             return Support([chosen], [1.0], {chosen: ["fallback_single_available_support"]})
         channels = {"forward": [], "reverse": []}
         selected, episode_counts, episode_steps = [], {}, {}
@@ -237,7 +268,7 @@ def select_support(method: str, budget: int, pool_size: int, alpha: float,
                     episode_steps.setdefault(episode, []).append(step)
             channels[channel].append(index)
             return True
-        rankings = {"forward": forward.indices, "reverse": reverse.indices}
+        rankings = {"forward": forward.order, "reverse": reverse.order}
         cursors = {"forward": 0, "reverse": 0}
         for channel, quota in (("forward", size//2), ("reverse", size-size//2)):
             while len(channels[channel]) < quota and cursors[channel] < len(rankings[channel]):
@@ -267,3 +298,18 @@ def select_support(method: str, budget: int, pool_size: int, alpha: float,
     else:
         raise ValueError(f"Unsupported support method: {method}")
     return Support(selected, [1 / len(selected)] * len(selected), {index: [method] for index in selected})
+
+
+def prepare_retrieval(memory, calibration: dict, settings: dict, directory, device) -> dict:
+    """Prepare backend assets independently of the expensive encoder cache."""
+    if settings.get("backend", "torch") == "torch":
+        return {"backend": "torch", "memory_windows": len(memory)}
+    from .cuvs_retrieval import prepare_cuvs
+    return prepare_cuvs(memory, calibration, settings, directory, device)
+
+
+def make_retriever(memory, calibration: dict, settings: dict, directory):
+    if settings.get("backend", "torch") == "torch":
+        return ExactRetriever(memory, calibration, settings)
+    from .cuvs_retrieval import CuVSRetriever
+    return CuVSRetriever(memory, calibration, settings, directory)

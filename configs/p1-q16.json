@@ -1,0 +1,11 @@
+{
+  "extends": "p1-lr1e-4.json",
+  "paths": {
+    "experiment_dir": "artifacts/p1-full-q16",
+    "cache_dir": "/opt/dlami/nvme/ubuntu/lewm_tta/p1-full/cache"
+  },
+  "data": {
+    "windows_per_query_episode": 16,
+    "split_from": "artifacts/p1-full/manifest.json"
+  }
+}

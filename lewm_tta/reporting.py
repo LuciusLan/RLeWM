@@ -6,6 +6,34 @@ from collections import defaultdict
 
 import numpy as np
 
+from .rank_reporting import summarize_topk_records
+
+
+def episode_statistics(values, episodes, config: dict):
+    """Descriptive statistics with the existing paired episode bootstrap."""
+    values = np.asarray(values, dtype=np.float64)
+    episodes = np.asarray(episodes)
+    if not len(values):
+        return None
+    if not np.isfinite(values).all():
+        raise ValueError("Nonfinite evaluation metrics")
+    unique = np.unique(episodes)
+    interval = None
+    samples = config["evaluation"]["bootstrap_samples"]
+    if len(unique) > 1 and samples:
+        totals = np.array([values[episodes == ep].sum() for ep in unique])
+        counts = np.array([(episodes == ep).sum() for ep in unique])
+        rng = np.random.default_rng(config["data"]["split_seed"])
+        means = []
+        for _ in range(samples):
+            draw = rng.integers(len(unique), size=len(unique))
+            means.append(totals[draw].sum() / counts[draw].sum())
+        interval = np.quantile(means, [.025, .975]).tolist()
+    return {"mean": float(values.mean()), "median": float(np.median(values)),
+            "std": float(values.std(ddof=1)) if len(values) > 1 else 0.0,
+            "p90": float(np.quantile(values, .9)), "mean_ci95": interval,
+            "rows": len(values), "episodes": len(unique)}
+
 
 def score_record(record: dict, target) -> dict:
     target = np.asarray(target, dtype=np.float64)
@@ -31,27 +59,7 @@ def summarize(records: list[dict], config: dict, accurate_threshold: float | Non
         accurate_threshold = float(np.quantile(list(initial.values()), settings["accurate_quantile"]))
 
     def statistics(values, episodes):
-        values = np.asarray(values, dtype=np.float64)
-        episodes = np.asarray(episodes)
-        if not len(values):
-            return None
-        if not np.isfinite(values).all():
-            raise ValueError("Nonfinite evaluation metrics")
-        unique = np.unique(episodes)
-        interval = None
-        if len(unique) > 1 and settings["bootstrap_samples"]:
-            totals = np.array([values[episodes == ep].sum() for ep in unique])
-            counts = np.array([(episodes == ep).sum() for ep in unique])
-            rng = np.random.default_rng(config["data"]["split_seed"])
-            means = []
-            for _ in range(settings["bootstrap_samples"]):
-                draw = rng.integers(len(unique), size=len(unique))
-                means.append(totals[draw].sum() / counts[draw].sum())
-            interval = np.quantile(means, [.025, .975]).tolist()
-        return {"mean": float(values.mean()), "median": float(np.median(values)),
-                "std": float(values.std(ddof=1)) if len(values) > 1 else 0.0,
-                "p90": float(np.quantile(values, .9)), "mean_ci95": interval,
-                "rows": len(values), "episodes": len(unique)}
+        return episode_statistics(values, episodes, config)
 
     results = {}
     lookups = {method: {(row["query"]["transition_id"], row["seed"]): row for row in rows}
@@ -85,6 +93,7 @@ def summarize(records: list[dict], config: dict, accurate_threshold: float | Non
                        if row["paired_delta"] > settings["harm_tolerance"]][:3]}
         results[method] = result
     diagnostics = {}
+    topk = summarize_topk_records(records, statistics)
     for method, rows in grouped.items():
         valid = [row for row in rows if row["rank_diagnostics_initial"]["memory_size"]]
         if not valid:
@@ -93,7 +102,10 @@ def summarize(records: list[dict], config: dict, accurate_threshold: float | Non
         by_query = defaultdict(list)
         for row in valid:
             by_query[row["query"]["transition_id"]].append(row)
-        gap = [group[0]["rank_diagnostics_initial"]["mean_absolute_log2_rank_gap"] for group in by_query.values()]
+        gap = [group[0]["rank_diagnostics_initial"]["mean_top1_log2_opposite_rank"] for group in by_query.values()]
+        rank_episodes = [group[0]["query"]["source_episode_position"] for group in by_query.values()]
+        forward_cross = [group[0]["rank_diagnostics_initial"]["forward_top1_reverse_rank"] for group in by_query.values()]
+        reverse_cross = [group[0]["rank_diagnostics_initial"]["reverse_top1_forward_rank"] for group in by_query.values()]
         error = [group[0]["mse_initial"] for group in by_query.values()]
         delta = [float(np.mean([row["paired_delta"] for row in group])) for group in by_query.values()]
         def spearman(a, b):
@@ -112,11 +124,16 @@ def summarize(records: list[dict], config: dict, accurate_threshold: float | Non
             if len(a) < 3 or np.ptp(a) == 0 or np.ptp(b) == 0:
                 return None
             return float(np.corrcoef(ranks(a), ranks(b))[0, 1])
-        diagnostics[method] = {"mean_initial_rank_gap": float(np.mean(gap)),
-            "mean_topk_overlap": float(np.mean([row["rank_diagnostics_initial"]["overlap_fraction"] for row in valid])),
-            "rank_gap_spearman_with_frozen_error": spearman(gap, error),
-            "rank_gap_spearman_with_adaptation_delta": spearman(gap, delta),
+        diagnostics[method] = {"forward_top1_reverse_rank": statistics(forward_cross, rank_episodes),
+            "reverse_top1_forward_rank": statistics(reverse_cross, rank_episodes),
+            "top1_log2_opposite_rank": statistics(gap, rank_episodes),
+            "supplementary_mean_topk_overlap": float(np.mean([
+                row["rank_diagnostics_initial"]["supplementary_topk"]["overlap_fraction"] for row in valid])),
+            "top1_cross_rank_spearman_with_frozen_error": spearman(gap, error),
+            "top1_cross_rank_spearman_with_adaptation_delta": spearman(gap, delta),
             "interpretation": "exploratory associations; disagreement is not a calibrated error detector"}
+        if method in topk:
+            diagnostics[method]["topk"] = topk[method]
     return {"queries": len(initial), "episodes": len({row["query"]["source_episode_position"] for row in records}),
             "accurate_threshold": accurate_threshold, "methods": results, "rank_diagnostics": diagnostics,
             "uncertainty": "paired episode bootstrap; all windows/seeds resampled together; conditional on one checkpoint",
@@ -132,5 +149,18 @@ def format_summary(summary: dict, output) -> str:
         ci = f"[{interval[0]:.4g}, {interval[1]:.4g}]" if interval else "--"
         lines.append(f"{method:<16} {row['mse']['mean']:<13.6g} {delta['mean']:<12.4g} {ci:<22} "
                      f"{row['improvement_fraction']:>7.1%} {row['harm_fraction']:>7.1%}")
+    if summary["rank_diagnostics"]:
+        ranks = next(iter(summary["rank_diagnostics"].values()))
+        if "topk" in ranks:
+            topk = ranks["topk"]
+            k_label = ",".join(str(value) for value in topk["requested_k_values"])
+            lines.append(f"Exact top-{k_label} cross-ranks (pooled candidate medians): "
+                f"forward in reverse = {topk['forward_candidates_in_reverse']['median']:g}; "
+                f"reverse in forward = {topk['reverse_candidates_in_forward']['median']:g}; "
+                f"mean |log2 R/F| = {topk['bidirectional_mean_absolute_log2_rank_ratio']['mean']:.4g}")
+            lines.append("Rank diagnostic selection: " + "; ".join(topk["selection_rules"]))
+        lines.append("Exact initial cross-ranks (medians): "
+            f"forward top-1 in reverse = {ranks['forward_top1_reverse_rank']['median']:g}; "
+            f"reverse top-1 in forward = {ranks['reverse_top1_forward_rank']['median']:g}")
     lines.append(f"Report: {output}")
     return "\n".join(lines) + "\n"

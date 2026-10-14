@@ -28,7 +28,10 @@
     "anchor_weight": 0.0
   },
   "retrieval": {
+    "backend": "torch",
     "pool_size": 32,
+    "diagnostic_topk": 32,
+    "diagnostic_selection": "raw",
     "calibration_pairs": 4096,
     "chunk_size": 4096,
     "beta_action": 1.0,

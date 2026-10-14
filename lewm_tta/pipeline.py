@@ -15,7 +15,7 @@ from .config import ROOT, validate_config
 from .data import action_statistics, get_manifest
 from .model import LeWMAdapter
 from .reporting import format_summary, score_record, summarize
-from .retrieval import ExactRetriever, calibrate_scales
+from .retrieval import calibrate_scales, make_retriever, prepare_retrieval
 from .runtime import file_hash, object_hash, read_json, write_json
 
 
@@ -38,6 +38,12 @@ def initialize(config: dict, device: str, cpu_threads: int):
 
 def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dict:
     started = time.perf_counter()
+    validate_config(config)
+    backend_checks = {}
+    if config["retrieval"].get("backend", "torch") == "cuvs":
+        from .cuvs_retrieval import check_cuvs_backend
+        backend_checks = check_cuvs_backend(device)
+        print(f"cuVS {backend_checks['version']}: synthetic backend checks passed", flush=True)
     adapter, manifest = initialize(config, device, cpu_threads)
     layout_checks = check_frame_bank_layout() if manifest["version"] == 2 else {}
     normalization_path = Path(config["paths"]["experiment_dir"]) / "action-normalization.json"
@@ -56,6 +62,8 @@ def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dic
     calibration_settings = {key: config["retrieval"][key] for key in ("calibration_pairs", "distance_floor")}
     calibration = calibrate_scales(memory, calibration_settings["calibration_pairs"],
                                    config["data"]["split_seed"], calibration_settings["distance_floor"])
+    retrieval_assets = prepare_retrieval(memory, calibration, config["retrieval"],
+                                        Path(config["paths"]["cache_dir"]), device)
     prepared = {"manifest": manifest["fingerprint"], "model": adapter.identity,
                 "model_fingerprint": adapter.fingerprint, "normalization": normalization,
                 "calibration": calibration, "calibration_settings": calibration_settings,
@@ -65,7 +73,8 @@ def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dic
                 "test_cache": test.identity if test is not None else None,
                 "cache_counts": {"memory": len(memory), "validation": len(validation),
                                  "test": len(test) if test is not None else None},
-                "layout_checks": layout_checks}
+                "layout_checks": layout_checks, "retrieval_assets": retrieval_assets,
+                "retrieval_backend_checks": backend_checks}
     prepared["fingerprint"] = object_hash(prepared)
     output = Path(config["paths"]["experiment_dir"]) / "prepared.json"
     write_json(output, prepared)
@@ -78,12 +87,16 @@ def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dic
             "episode_counts": {split: len(group) for split, group in manifest["episodes"].items()},
             "evaluation_queries": {split: selection["count"] for split, selection in manifest["evaluation_windows"].items()},
             "numeric_payload_bytes": payload, "numeric_payload_gib": payload / 2**30,
+            "retrieval_key_payload_bytes": retrieval_assets.get("numeric_payload_bytes", 0),
+            "retrieval_key_payload_gib": retrieval_assets.get("numeric_payload_bytes", 0) / 2**30,
             "layout": "one projected latent per raw observation, normalized raw actions, int64 window starts",
             "observations": memory.store.identity}
         write_json(Path(config["paths"]["experiment_dir"]) / "cache-summary.json", cache_summary)
         print(f"P1 full cache prepared | {rows:,} observations | memory {len(memory):,} | "
               f"validation {len(validation):,} | test {len(test):,}\n"
-              f"Numeric storage: {payload/2**30:.2f} GiB | {time.perf_counter()-started:.1f}s\n"
+              f"Shared cache: {payload/2**30:.2f} GiB | "
+              f"retrieval keys: {retrieval_assets.get('numeric_payload_bytes', 0)/2**30:.2f} GiB | "
+              f"{time.perf_counter()-started:.1f}s\n"
               f"All splits cached; test remains unscored.\nPrepared record: {output}", flush=True)
     else:
         print(f"P1 prepared | memory {len(memory)} | validation {len(validation)} | "
@@ -119,7 +132,14 @@ def evaluate(config: dict, device: str, cpu_threads: int, batch_size: int,
     queries = queries.for_evaluation()
     if not len(queries):
         raise ValueError("No eligible query windows")
-    retriever = ExactRetriever(memory, prepared["calibration"], config["retrieval"])
+    if config["retrieval"].get("backend", "torch") == "cuvs" and "retrieval_assets" not in prepared:
+        raise ValueError("cuVS assets are not recorded in prepared.json; run prepare again")
+    retriever = make_retriever(memory, prepared["calibration"], config["retrieval"],
+                               Path(config["paths"]["cache_dir"]))
+    if config["retrieval"].get("backend", "torch") == "cuvs":
+        assets = retriever.assets if len(memory) else prepared["retrieval_assets"]
+        if assets["fingerprint"] != prepared["retrieval_assets"]["fingerprint"]:
+            raise ValueError("cuVS index keys changed since preparation; run prepare again")
     engine = AdaptationEngine(adapter, memory, retriever, config["adaptation"])
     name = run_name or f"{split}-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}"
     if Path(name).name != name or name in (".", ".."):
@@ -173,13 +193,17 @@ def evaluate(config: dict, device: str, cpu_threads: int, batch_size: int,
     report = {"completed": True, "stage": "P1", "split": split, "config": config,
               "prepared_fingerprint": prepared["fingerprint"], "manifest_fingerprint": manifest["fingerprint"],
               "model": adapter.identity, "code": implementation, "checks": checks,
+              "retrieval_backend": config["retrieval"].get("backend", "torch"),
+              "retrieval_runtime": getattr(retriever, "backend_info", {"backend": "torch"}),
+              "retrieval_assets": prepared.get("retrieval_assets"),
+              "retrieval_backend_checks": prepared.get("retrieval_backend_checks"),
               "parameter_names": adapter.parameter_names, "parameter_count": adapter.parameter_count,
               "records_file": str(records_path), "records_sha256": file_hash(records_path),
               "summary": summary, "evaluation_seconds": time.perf_counter()-started,
               "query_episode_positions": sorted({item["source_episode_position"] for item in queries.items}),
               "checkpoint_overlap": manifest["checkpoint_overlap"],
               "limits": ["Physical contact/motion subsets deferred until state coordinates are audited",
-                         "Prototype latency includes exhaustive rank diagnostics and frozen-state checks",
+                         "Prototype latency includes full-corpus distance/rank diagnostics and frozen-state checks",
                          "Rank consensus is fixed at the initial prediction; this run does not establish refresh utility"]}
     report_path = output / "report.json"
     write_json(report_path, report)

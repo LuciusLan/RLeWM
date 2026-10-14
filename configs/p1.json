@@ -12,6 +12,12 @@
     "checkpoint_rows": 8192
   },
   "retrieval": {
+    "backend": "cuvs",
+    "initial_search_k": 256,
+    "max_search_k": 2048,
+    "index_batch_rows": 8192,
+    "index_checkpoint_rows": 131072,
+    "device_reserve_gib": 2,
     "max_windows_per_episode": 4,
     "min_start_step_gap": 20
   }
