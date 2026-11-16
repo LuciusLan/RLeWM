@@ -1,0 +1,16 @@
+{
+  "extends": "fresh.json",
+  "schedule_names": [
+    "temporal-u1",
+    "temporal-u2",
+    "temporal-u1-reset",
+    "temporal-u2-reset"
+  ],
+  "schedules": {
+    "temporal-u2-reset": {
+      "placement": "each-step",
+      "updates": 2,
+      "persistence": "position"
+    }
+  }
+}

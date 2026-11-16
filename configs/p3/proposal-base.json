@@ -1,0 +1,17 @@
+{
+  "extends": "base.json",
+  "proposals": {
+    "sources": ["gaussian", "uniform-fragments", "context-fragments", "goal-context-fragments"],
+    "fragments": 8,
+    "injection_slots": 64,
+    "noise_std": 0.1,
+    "max_fragments_per_episode": 2,
+    "min_start_step_gap": 25,
+    "max_scan_candidates": 8192,
+    "context_chunk_rows": 32768,
+    "goal_weight": 1,
+    "goal_calibration_pairs": 8192,
+    "goal_calibration_seed": 20261026,
+    "goal_distance_floor": 1e-8
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "extends": "cube.json",
+  "output_dir": "/home/ubuntu/project/datasets/fresh_data/cube-mj36"
+}

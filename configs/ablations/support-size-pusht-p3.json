@@ -1,0 +1,12 @@
+{
+  "dataset": "pusht",
+  "stage": "p3",
+  "reference_report": "artifacts/p3-fresh-pusht-v2/runs/fresh-validation/report.json",
+  "reference_report_sha256": "f92c6df6f10e68011a128c33f80a15586b97c0951805b416c12951d6f8de5c8e",
+  "experiment_dir": "artifacts/p3-support-size-fresh-pusht-v2",
+  "support_sizes": [16, 32, 64, 128],
+  "reference_size": 32,
+  "methods": ["frozen", "uniform", "fr-fixed"],
+  "seeds": [42, 43, 44],
+  "learning_rate": 0.00005
+}

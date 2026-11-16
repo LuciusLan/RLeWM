@@ -1,0 +1,18 @@
+{
+  "extends": "source-base.json",
+  "paths": {
+    "checkpoint": "/home/ubuntu/project/pretrained/lewm-tworooms",
+    "dataset": "/home/ubuntu/project/artifacts/preprocessing/tworooms/source.h5",
+    "experiment_dir": "/home/ubuntu/project/artifacts/preprocessing/tworooms",
+    "cache_dir": "/home/ubuntu/lewm_tta/tworooms"
+  },
+  "data": {"dataset_id": "tworooms"},
+  "preprocessing": {
+    "raw_dataset": "/opt/dlami/nvme/ubuntu/lewm_tworooms/tworoom.h5",
+    "archive": "/home/ubuntu/project/datasets/lewm_tworooms/tworoom.tar.zst",
+    "member": "tworoom.h5",
+    "estimated_raw_rows": 920809,
+    "estimated_episodes": 10000,
+    "environment": {"env_name": "swm/TwoRoom-v1"}
+  }
+}

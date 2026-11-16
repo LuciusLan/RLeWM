@@ -1,0 +1,10 @@
+{
+  "extends": "native-base.json",
+  "backend": "reacher",
+  "output_dir": "/home/ubuntu/project/datasets/fresh_data/reacher",
+  "reference_dataset": "/home/ubuntu/project/artifacts/preprocessing/reacher/source.h5",
+  "policy": {"name": "joint-waypoints", "kp": 1.0, "kd": 0.2, "action_noise": 0.02, "waypoint_steps": 30},
+  "goal_protocols": {
+    "lewm-paper": {"goal_offset_steps": 25, "eval_budget": 50, "source": "le-wm/config/eval/reacher.yaml"}
+  }
+}

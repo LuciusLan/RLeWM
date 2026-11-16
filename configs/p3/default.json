@@ -1,0 +1,28 @@
+{
+  "extends": "proposal-base.json",
+  "experiment_dir": "artifacts/p3-factorial-v64-t150-q4",
+  "comparison": "factorial",
+  "adaptation": {
+    "methods": [
+      "frozen",
+      "uniform",
+      "fr-fixed"
+    ]
+  },
+  "proposals": {
+    "sources": [
+      "gaussian",
+      "context-fragments"
+    ]
+  },
+  "reuse": {
+    "validation": [{
+      "report": "artifacts/p3-temporal-v64-t150-q4/runs/shared-depth-val-full/report.json",
+      "sha256": "455e6a728e4d7db3c5f6d23afa144d3ba991343f452bd0c5c8282d0f3941d21b"
+    }],
+    "test": [{
+      "report": "artifacts/p3-temporal-v64-t150-q4/runs/shared-depth-test/report.json",
+      "sha256": "ca90f28fb95479c510a448407834198fa81ee0815f22a3b4ad970b9cc7d9bbf5"
+    }]
+  }
+}

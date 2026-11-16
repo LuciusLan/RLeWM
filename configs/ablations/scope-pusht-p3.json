@@ -1,0 +1,19 @@
+{
+  "dataset": "pusht",
+  "stage": "p3",
+  "experiment_dir": "artifacts/p3-scope-fresh-pusht-v2",
+  "support_size": 32,
+  "methods": ["frozen", "uniform", "fr-fixed"],
+  "scopes": ["last-block", "predictor"],
+  "available_scopes": ["last-block", "predictor", "predictor-action"],
+  "learning_rates": [0.000005, 0.00001, 0.00005],
+  "default_learning_rates": [0.00005],
+  "seeds": [42, 43, 44],
+  "references": [
+    {
+      "learning_rate": 0.00005,
+      "report": "artifacts/p3-fresh-pusht-v2/runs/fresh-validation/report.json",
+      "sha256": "f92c6df6f10e68011a128c33f80a15586b97c0951805b416c12951d6f8de5c8e"
+    }
+  ]
+}

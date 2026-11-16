@@ -1,0 +1,11 @@
+{
+  "extends": "native-base.json",
+  "backend": "tworooms",
+  "output_dir": "/home/ubuntu/project/datasets/fresh_data/tworooms",
+  "reference_dataset": "/home/ubuntu/project/artifacts/preprocessing/tworooms/source.h5",
+  "policy": {"name": "native-doorway", "action_noise": 0.1},
+  "goal_protocols": {
+    "lewm-repository": {"goal_offset_steps": 25, "eval_budget": 50, "source": "le-wm/config/eval/tworoom.yaml"},
+    "lewm-paper": {"goal_offset_steps": 100, "eval_budget": 150, "source": "https://arxiv.org/html/2603.19312v1#A6.SS1"}
+  }
+}

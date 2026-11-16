@@ -1,0 +1,52 @@
+{
+  "extends": "base.json",
+  "experiment_dir": "artifacts/p2-followup-v64-t150-q4",
+  "adaptation": {
+    "methods": [
+      "frozen",
+      "forward",
+      "reverse",
+      "fr-fixed",
+      "fr-refresh"
+    ],
+    "learning_rate": 0.00001
+  },
+  "cohort_horizon": 5,
+  "horizons": [
+    1,
+    3
+  ],
+  "schedule_names": [
+    "initial-u1",
+    "initial-u3",
+    "temporal-u1"
+  ],
+  "schedules": {
+    "initial-u1": {
+      "placement": "initial",
+      "updates": 1,
+      "persistence": "trajectory"
+    },
+    "initial-u3": {
+      "placement": "initial",
+      "updates": 3,
+      "persistence": "trajectory"
+    },
+    "temporal-u1": {
+      "placement": "each-step",
+      "updates": 1,
+      "persistence": "trajectory"
+    },
+    "temporal-u2": {
+      "placement": "each-step",
+      "updates": 2,
+      "persistence": "trajectory"
+    },
+    "temporal-u1-reset": {
+      "placement": "each-step",
+      "updates": 1,
+      "persistence": "position"
+    }
+  },
+  "evaluation": {}
+}

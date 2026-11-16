@@ -1,0 +1,13 @@
+{
+  "extends": "base.json",
+  "experiment_dir": "artifacts/p3a-offline-v64-t150-q4",
+  "adaptation": {
+    "methods": [
+      "frozen",
+      "uniform",
+      "forward",
+      "reverse",
+      "fr-fixed"
+    ]
+  }
+}

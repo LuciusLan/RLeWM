@@ -1,0 +1,15 @@
+{
+  "extends": "green.json",
+  "experiment_dir": "artifacts/p3-green-pusht-lewm-budget",
+  "planning": {
+    "horizon": 5,
+    "population": 300,
+    "iterations": 30,
+    "elites": 30,
+    "initial_std": 1,
+    "minimum_std": 0
+  },
+  "simulation": {
+    "execute_blocks": 5
+  }
+}

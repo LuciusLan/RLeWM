@@ -1,0 +1,18 @@
+{
+  "extends": "source-base.json",
+  "paths": {
+    "checkpoint": "/home/ubuntu/project/pretrained/lewm-reacher",
+    "dataset": "/home/ubuntu/project/artifacts/preprocessing/reacher/source.h5",
+    "experiment_dir": "/home/ubuntu/project/artifacts/preprocessing/reacher",
+    "cache_dir": "/home/ubuntu/lewm_tta/reacher"
+  },
+  "data": {"dataset_id": "reacher"},
+  "preprocessing": {
+    "raw_dataset": "/opt/dlami/nvme/ubuntu/lewm_reacher/reacher.h5",
+    "archive": "/opt/dlami/nvme/ubuntu/lewm_reacher/reacher.tar.zst",
+    "member": "reacher.h5",
+    "estimated_raw_rows": 2010000,
+    "estimated_episodes": 10000,
+    "environment": {"env_name": "swm/ReacherDMControl-v0", "task": "qpos_match"}
+  }
+}

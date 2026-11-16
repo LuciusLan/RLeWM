@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "episodes": 8,
+  "seed": 20261113,
+  "raw_steps": 200,
+  "window_starts": [0, 50, 100, 150],
+  "history": 3,
+  "frameskip": 5,
+  "horizon": 5,
+  "expected_physics": {"mujoco": "3.6.0", "dm-control": "1.0.38"},
+  "policies": {
+    "markov": {"action_noise": 0.1, "min_norm": 0.4},
+    "plan": {"noise": 0.1, "noise_smoothing": 0.5, "segment_dt": 0.4}
+  },
+  "frozen_reference": "artifacts/diagnostics/frozen-rollout/cube-parity-swmr-fixed/report.json",
+  "frozen_reference_sha256": "7f6f9f34bca1a30a33749bd91db2595d91c3278ba348a16ad1c139f2988b292b",
+  "repo": "le-wm"
+}

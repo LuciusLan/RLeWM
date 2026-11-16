@@ -1,0 +1,24 @@
+{
+  "extends": "../p3/proposal-base.json",
+  "comparison": "factorial",
+  "experiment_dir": "artifacts/p3-green-pusht-v1",
+  "adaptation": {"methods": ["frozen", "uniform", "fr-fixed"]},
+  "proposals": {"sources": ["gaussian", "context-fragments"]},
+  "simulation": {
+    "task": "green-target",
+    "backend": "pusht",
+    "episodes": 32,
+    "test_episodes": 100,
+    "cohort_seed": 20261104,
+    "seeds": [42],
+    "split": "validation",
+    "image_size": 224,
+    "max_raw_steps": 300,
+    "execute_blocks": 1,
+    "success_coverage": 0.95,
+    "goal_agent_position": [64, 64],
+    "shift": {},
+    "runtime_budget_hours": null
+  },
+  "evaluation": {"records": "compact", "call_records": "compact", "query_limit": null, "log_every": 1}
+}

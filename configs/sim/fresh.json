@@ -1,0 +1,16 @@
+{
+  "extends": "../p3/fresh.json",
+  "experiment_dir": "artifacts/p3-simulator-fresh-pusht-v2",
+  "simulation": {
+    "backend": "pusht",
+    "episodes": 32,
+    "cohort_seed": 20261102,
+    "seeds": [42],
+    "image_size": 224,
+    "max_raw_steps": 50,
+    "execute_blocks": 5,
+    "runtime_budget_hours": 5
+  },
+  "planning": {"population": 300, "iterations": 30, "elites": 30, "initial_std": 1},
+  "evaluation": {"records": "compact", "call_records": "compact", "query_limit": null, "log_every": 1}
+}

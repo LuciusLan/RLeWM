@@ -31,6 +31,10 @@ def load_config(path: Path) -> dict:
     config = read_inherited(path, [])
     for key, value in config["paths"].items():
         config["paths"][key] = str((ROOT / value).resolve()) if not Path(value).is_absolute() else value
+    for key in ("archive", "raw_dataset"):
+        if key in config.get("preprocessing", {}):
+            value = Path(config["preprocessing"][key])
+            config["preprocessing"][key] = str((ROOT / value).resolve())
     config["data"]["inspected_reports"] = [
         str((ROOT / path).resolve()) if not Path(path).is_absolute() else path
         for path in config["data"]["inspected_reports"]
@@ -47,9 +51,19 @@ def load_config(path: Path) -> dict:
 
 def validate_config(config: dict) -> None:
     data, adaptation, retrieval = config["data"], config["adaptation"], config["retrieval"]
-    for key in ("history", "frameskip", "validation_episodes", "test_episodes"):
+    for key in ("history", "frameskip"):
         if data[key] < 1:
             raise ValueError(f"data.{key} must be positive")
+    if not isinstance(data.get("memory_only", False), bool):
+        raise ValueError("data.memory_only must be boolean")
+    if data.get("memory_only", False):
+        if data["memory_windows"] != "all" or data.get("split_from") or any(
+                data[key] != 0 for key in ("validation_episodes", "test_episodes")):
+            raise ValueError("Memory-only preparation requires all memory windows, zero query episodes and no split_from")
+    elif any(data[key] < 1 for key in ("validation_episodes", "test_episodes")):
+        raise ValueError("Validation and test episode counts must be positive unless data.memory_only=true")
+    if "dataset_id" in data and (not isinstance(data["dataset_id"], str) or not data["dataset_id"].strip()):
+        raise ValueError("data.dataset_id must be a nonempty string")
     if data["memory_windows"] != "all" and (not isinstance(data["memory_windows"], int) or data["memory_windows"] < 0):
         raise ValueError("data.memory_windows must be a nonnegative integer or 'all'")
     if data["windows_per_query_episode"] != "all" and (

@@ -1,0 +1,12 @@
+{
+  "extends": "interleave.json",
+  "experiment_dir": "artifacts/evaluation/pusht/p3-interleave-lewm-budget",
+  "planning": {
+    "horizon": 5,
+    "population": 300,
+    "iterations": 30,
+    "elites": 30,
+    "initial_std": 1,
+    "minimum_std": 0
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "extends": "interleave.json",
+  "experiment_dir": "artifacts/evaluation/pusht/p3-interleave-controls",
+  "interleave": {"reference_source": "random"}
+}

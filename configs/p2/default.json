@@ -1,0 +1,65 @@
+{
+  "extends": "base.json",
+  "experiment_dir": "artifacts/p2-final-v64-t150-q4-h5",
+  "adaptation": {
+    "methods": [
+      "frozen",
+      "uniform",
+      "forward",
+      "reverse",
+      "fr-fixed",
+      "fr-refresh",
+      "rank-consensus"
+    ]
+  },
+  "cohort_horizon": 5,
+  "schedule_names": [
+    "initial-u1",
+    "initial-u5",
+    "initial-u5-1e-5",
+    "temporal-u1",
+    "temporal-u2",
+    "temporal-u2-2e-5",
+    "temporal-u1-reset"
+  ],
+  "schedules": {
+    "initial-u1": {
+      "placement": "initial",
+      "updates": 1,
+      "persistence": "trajectory"
+    },
+    "initial-u5": {
+      "placement": "initial",
+      "updates": 5,
+      "persistence": "trajectory"
+    },
+    "initial-u5-1e-5": {
+      "placement": "initial",
+      "updates": 5,
+      "persistence": "trajectory",
+      "learning_rate": 0.00001
+    },
+    "temporal-u1": {
+      "placement": "each-step",
+      "updates": 1,
+      "persistence": "trajectory"
+    },
+    "temporal-u2": {
+      "placement": "each-step",
+      "updates": 2,
+      "persistence": "trajectory"
+    },
+    "temporal-u2-2e-5": {
+      "placement": "each-step",
+      "updates": 2,
+      "persistence": "trajectory",
+      "learning_rate": 0.00002
+    },
+    "temporal-u1-reset": {
+      "placement": "each-step",
+      "updates": 1,
+      "persistence": "position"
+    }
+  },
+  "evaluation": {}
+}

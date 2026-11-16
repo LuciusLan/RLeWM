@@ -1,0 +1,10 @@
+{
+  "extends": "proposal-base.json",
+  "experiment_dir": "artifacts/p3b-goal-offline-v64-t150-q4",
+  "comparison": "proposal-only",
+  "adaptation": {
+    "methods": [
+      "frozen"
+    ]
+  }
+}

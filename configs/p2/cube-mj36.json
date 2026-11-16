@@ -1,0 +1,15 @@
+{
+  "extends": "fresh-temporal.json",
+  "evaluation_dataset": "cube",
+  "p1_config": "codes/configs/p1/cube.json",
+  "experiment_dir": "artifacts/evaluation/cube-mj36/p2",
+  "query_dataset": {
+    "collection_config": "codes/configs/collect/cube-mj36.json",
+    "regime": "source",
+    "batch_size": 128
+  },
+  "adaptation": {
+    "methods": ["frozen", "uniform", "fr-fixed", "forward", "reverse"],
+    "learning_rate": 0.0001
+  }
+}

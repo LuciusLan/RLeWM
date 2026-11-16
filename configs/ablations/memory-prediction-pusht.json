@@ -1,0 +1,26 @@
+{
+  "dataset": "pusht",
+  "experiment_dir": "artifacts/p2-memory-prediction-fresh-pusht-v2",
+  "cache_dir": "/home/ubuntu/lewm_tta/pusht_split/prediction-controls",
+  "selectors": ["uniform", "forward", "fr-fixed"],
+  "controls": ["residual-transfer", "delta-transfer"],
+  "gains": [0.0, 0.25, 0.5, 1.0],
+  "selection_horizon": 5,
+  "test_unit_gain": true,
+  "support_size": 32,
+  "horizon": 5,
+  "reference_schedule": "temporal-u1",
+  "seeds": [42, 43, 44],
+  "cache": {"batch_rows": 256, "checkpoint_rows": 8192},
+  "evaluation": {"bootstrap_samples": 10000, "log_every": 8},
+  "references": {
+    "validation": {
+      "report": "artifacts/p2-fresh-pusht-v2/runs/fresh-validation/report.json",
+      "sha256": "4f212d416e145b27c0094c62f8d6dd5e261fbd116648a43caa0871505c3278a3"
+    },
+    "test": {
+      "report": "artifacts/p2-fresh-pusht-v2/runs/fresh-test/report.json",
+      "sha256": "83e465b35716937c1a3243f9c3550204141175707f64ef717ebbe723fbaecfa0"
+    }
+  }
+}

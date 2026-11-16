@@ -1,0 +1,21 @@
+{
+  "extends": "base.json",
+  "comparison": "temporal-planning",
+  "experiment_dir": "artifacts/p3-temporal-v64-t150-q4",
+  "adaptation": {
+    "methods": ["frozen", "fr-fixed"]
+  },
+  "temporal": {
+    "modes": ["frozen", "shared-initial", "shared-depth", "candidate-temporal"],
+    "selector": "fr-fixed",
+    "persistence": "trajectory"
+  },
+  "evaluation": {
+    "seeds": [42, 43, 44],
+    "seeds_by_mode": {
+      "candidate-temporal": [42]
+    },
+    "query_limit": 8,
+    "records": "compact"
+  }
+}

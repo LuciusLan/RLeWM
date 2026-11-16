@@ -1,0 +1,33 @@
+{
+  "raw_root": "/opt/dlami/nvme/ubuntu/lewm_appearance",
+  "cache_root": "/home/ubuntu/lewm_tta/appearance",
+  "output_root": "artifacts/appearance-evaluation",
+  "p2_methods": ["frozen", "uniform", "forward", "reverse", "fr-fixed"],
+  "p2_schedules": ["temporal-u1"],
+  "conditions": {
+    "pusht-object": {
+      "dataset": "pusht",
+      "p1_config": "codes/configs/p1/default.json",
+      "collection_config": "codes/configs/collect/default.json",
+      "learning_rate": 0.00005,
+      "seeds": [42, 43, 44],
+      "appearance": {"object_color": [200, 70, 60]}
+    },
+    "pusht-background": {
+      "dataset": "pusht",
+      "p1_config": "codes/configs/p1/default.json",
+      "collection_config": "codes/configs/collect/default.json",
+      "learning_rate": 0.00005,
+      "seeds": [42, 43, 44],
+      "appearance": {"background_pattern": "checkerboard", "background_color": [240, 230, 210], "background_color2": [210, 195, 175], "pattern_size": 128}
+    },
+    "reacher-background": {
+      "dataset": "reacher",
+      "p1_config": "codes/configs/p1/reacher.json",
+      "collection_config": "codes/configs/collect/reacher-checkerboard.json",
+      "learning_rate": 0.0001,
+      "seeds": [41, 42, 43],
+      "appearance": {"background_pattern": "solid", "background_color": [26, 51, 77]}
+    }
+  }
+}

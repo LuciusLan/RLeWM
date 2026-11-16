@@ -1,0 +1,12 @@
+{
+  "seed": 20261106,
+  "splits": {"validation": 64, "test": 100},
+  "raw_steps": 200,
+  "history": 3,
+  "frameskip": 5,
+  "image_size": 224,
+  "goal_offset_steps": 25,
+  "windows_per_episode": 4,
+  "compression": "gzip",
+  "regimes": {"source": {}}
+}

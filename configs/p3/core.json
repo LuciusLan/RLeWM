@@ -1,0 +1,27 @@
+{
+  "extends": "interleave-lewm-budget.json",
+  "experiment_dir": "artifacts/evaluation/pusht/p3-core",
+  "planning": {"iterations": 16},
+  "evaluation": {"seeds": [42]},
+  "interleave": {"arms": ["baseline", "rca"]},
+  "core": {
+    "mid_search": false,
+    "iterations": [2, 4, 8, 16],
+    "control_budget": 25,
+    "runtime_budget_hours": 8,
+    "python_by_dataset": {
+      "default": "/home/ubuntu/.venv/bin/python",
+      "cube": ".venvs/physics-mj36/bin/python"
+    },
+    "collection_by_dataset": {"cube": "codes/configs/collect/cube-plan.json"},
+    "initial_source": "context-fragments",
+    "pusht_success": "native-goal",
+    "coverage_threshold": 0.95,
+    "state_atol": 0.00001,
+    "rgb_mae_atol": 0.1,
+    "success_targets": [0.5, 0.8, 0.9],
+    "deadlines": [0.5, 1, 2, 5, 10],
+    "bootstrap_samples": 1000,
+    "bootstrap_seed": 20261114
+  }
+}

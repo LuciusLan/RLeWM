@@ -58,6 +58,9 @@ class LatentBank:
 def build_or_load_cache(adapter: LeWMAdapter, manifest: dict, normalization: dict,
                         split: str, directory: Path, batch_size: int = 32, checkpoint_rows: int = 8192):
     if manifest["version"] == 2:
+        if manifest["data_config"].get("dataset_id"):
+            from .preprocessing.banks import build_source_bank
+            return build_source_bank(adapter, manifest, normalization, split, directory, batch_size, checkpoint_rows)
         from .frame_bank import build_frame_bank
         return build_frame_bank(adapter, manifest, normalization, split, directory, batch_size, checkpoint_rows)
     identity = {"version": 1, "manifest": manifest["fingerprint"], "model": adapter.fingerprint,

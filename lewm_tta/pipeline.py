@@ -8,6 +8,8 @@ import time
 
 import torch
 
+from experiments.progress import progress
+
 from .adaptation import AdaptationEngine
 from .cache import build_or_load_cache
 from .checks import check_frame_bank_layout, run_checks
@@ -20,11 +22,14 @@ from .runtime import file_hash, object_hash, read_json, write_json
 
 
 def code_identity() -> dict:
-    sources = sorted((ROOT / "codes" / "lewm_tta").glob("*.py")) + [ROOT / "codes" / "p1.py"]
-    return {str(path.relative_to(ROOT)): file_hash(path) for path in sources}
+    from experiments.provenance import backend_identity
+    return backend_identity("p1")
 
 
 def initialize(config: dict, device: str, cpu_threads: int):
+    if config.get("preprocessing", {}).get("raw_dataset"):
+        from .preprocessing.hdf5 import prepare_source_view
+        prepare_source_view(config)
     torch.set_num_threads(cpu_threads)
     torch.backends.cuda.matmul.allow_tf32 = False
     torch.backends.cudnn.allow_tf32 = False
@@ -39,18 +44,24 @@ def initialize(config: dict, device: str, cpu_threads: int):
 def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dict:
     started = time.perf_counter()
     validate_config(config)
+    from .shifted.reference import load_reference
+    reference = load_reference(config)
     backend_checks = {}
     if config["retrieval"].get("backend", "torch") == "cuvs":
         from .cuvs_retrieval import check_cuvs_backend
         backend_checks = check_cuvs_backend(device)
         print(f"cuVS {backend_checks['version']}: synthetic backend checks passed", flush=True)
     adapter, manifest = initialize(config, device, cpu_threads)
+    if reference is not None and reference["model_fingerprint"] != adapter.fingerprint:
+        raise ValueError("Shifted memory and frozen source reference must use the same model/encoder")
     layout_checks = check_frame_bank_layout() if manifest["version"] == 2 else {}
     normalization_path = Path(config["paths"]["experiment_dir"]) / "action-normalization.json"
     if normalization_path.exists():
         normalization = read_json(normalization_path)
+        if reference is not None and normalization != reference["normalization"]:
+            raise ValueError("Existing normalization differs from the frozen source reference")
     else:
-        normalization = action_statistics(manifest)
+        normalization = reference["normalization"] if reference is not None else action_statistics(manifest)
         write_json(normalization_path, normalization)
     memory = build_or_load_cache(adapter, manifest, normalization, "memory",
                                 Path(config["paths"]["cache_dir"]), batch_size,
@@ -60,8 +71,9 @@ def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dic
     test = build_or_load_cache(adapter, manifest, normalization, "test",
                               Path(config["paths"]["cache_dir"]), batch_size) if manifest["version"] == 2 else None
     calibration_settings = {key: config["retrieval"][key] for key in ("calibration_pairs", "distance_floor")}
-    calibration = calibrate_scales(memory, calibration_settings["calibration_pairs"],
-                                   config["data"]["split_seed"], calibration_settings["distance_floor"])
+    calibration = (reference["calibration"] if reference is not None else
+                   calibrate_scales(memory, calibration_settings["calibration_pairs"],
+                                    config["data"]["split_seed"], calibration_settings["distance_floor"]))
     retrieval_assets = prepare_retrieval(memory, calibration, config["retrieval"],
                                         Path(config["paths"]["cache_dir"]), device)
     prepared = {"manifest": manifest["fingerprint"], "model": adapter.identity,
@@ -75,6 +87,8 @@ def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dic
                                  "test": len(test) if test is not None else None},
                 "layout_checks": layout_checks, "retrieval_assets": retrieval_assets,
                 "retrieval_backend_checks": backend_checks}
+    if reference is not None:
+        prepared["memory_reference"] = config["memory_reference"]
     prepared["fingerprint"] = object_hash(prepared)
     output = Path(config["paths"]["experiment_dir"]) / "prepared.json"
     write_json(output, prepared)
@@ -107,8 +121,12 @@ def prepare(config: dict, device: str, cpu_threads: int, batch_size: int) -> dic
 def evaluate(config: dict, device: str, cpu_threads: int, batch_size: int,
              split: str = "validation", run_name: str | None = None, lock: dict | None = None) -> dict:
     validate_config(config)
+    if config["data"].get("memory_only"):
+        raise ValueError("This profile prepares retrieval memory only; collect independent query episodes before evaluation")
+    import time
     if split == "test" and lock is None:
         raise ValueError("Test evaluation requires a locked validation configuration")
+    print(f"Initializing: {time.perf_counter()}")
     adapter, manifest = initialize(config, device, cpu_threads)
     prepared = read_json(Path(config["paths"]["experiment_dir"]) / "prepared.json")
     if prepared["manifest"] != manifest["fingerprint"] or prepared["model_fingerprint"] != adapter.fingerprint:
@@ -120,10 +138,12 @@ def evaluate(config: dict, device: str, cpu_threads: int, batch_size: int,
     if lock is not None and (lock["prepared_fingerprint"] != prepared["fingerprint"] or
                              lock["code"] != implementation or lock["config"] != config):
         raise ValueError("Locked configuration, code, or prepared identity changed")
+    print(f"Loading: {time.perf_counter()}")
     memory = build_or_load_cache(adapter, manifest, prepared["normalization"], "memory",
                                 Path(config["paths"]["cache_dir"]), batch_size).to(adapter.device)
     queries = build_or_load_cache(adapter, manifest, prepared["normalization"], split,
                                  Path(config["paths"]["cache_dir"]), batch_size).to(adapter.device)
+    print(f"Finished load: {time.perf_counter()}")
     if memory.identity != prepared["memory_cache"] or (split == "validation" and
                                                        queries.identity != prepared["validation_cache"]):
         raise ValueError("Cache implementation/identity changed since preparation; run prepare again")
@@ -163,8 +183,9 @@ def evaluate(config: dict, device: str, cpu_threads: int, batch_size: int,
     records, started = [], time.perf_counter()
     import json
     records_path = output / "records.jsonl"
-    with records_path.open("w") as stream:
-        for index in range(len(queries)):
+    with records_path.open("w") as stream, progress(
+            range(len(queries)), config=config, desc=f"P1 {split}") as query_progress:
+        for index in query_progress:
             query = queries.query(index)
             initial_reference = None
             for seed in config["evaluation"]["seeds"]:
@@ -181,14 +202,14 @@ def evaluate(config: dict, device: str, cpu_threads: int, batch_size: int,
                         assert record["mse_final"] == record["mse_initial"]
                     records.append(record)
                     paired[method] = record
-                    stream.write(json.dumps(record, allow_nan=False) + "\n")
+                    #stream.write(json.dumps(record, allow_nan=False) + "\n")
                 if all(method in paired and paired[method]["rounds"] for method in ("fr-fixed", "fr-refresh")):
                     torch.testing.assert_close(torch.tensor(paired["fr-fixed"]["rounds"][0]["prediction_after"]),
                         torch.tensor(paired["fr-refresh"]["rounds"][0]["prediction_after"]), rtol=1e-6, atol=1e-7)
             done, frequency = index + 1, config["evaluation"]["log_every"]
             if done == len(queries) or (frequency and done % frequency == 0):
                 stream.flush()
-                print(f"P1 {split}: {done}/{len(queries)} queries | {time.perf_counter()-started:.1f}s", flush=True)
+            query_progress.set_postfix(records=len(records), refresh=False)
     summary = summarize(records, config, lock["accurate_threshold"] if lock else None)
     report = {"completed": True, "stage": "P1", "split": split, "config": config,
               "prepared_fingerprint": prepared["fingerprint"], "manifest_fingerprint": manifest["fingerprint"],

@@ -1,0 +1,19 @@
+{
+  "extends": "source-base.json",
+  "paths": {
+    "checkpoint": "/home/ubuntu/project/pretrained/lewm-cube",
+    "dataset": "/home/ubuntu/project/artifacts/preprocessing/cube/source.h5",
+    "experiment_dir": "/home/ubuntu/project/artifacts/preprocessing/cube",
+    "cache_dir": "/home/ubuntu/lewm_tta/cube"
+  },
+  "data": {"dataset_id": "cube"},
+  "preprocessing": {
+    "raw_dataset": "/opt/dlami/nvme/ubuntu/lewm_cube/cube_single_expert.h5",
+    "archive": "/opt/dlami/nvme/ubuntu/lewm_cube/cube_single_expert.tar.zst",
+    "member": "cube_single_expert.h5",
+    "raw_action_dim": 5,
+    "estimated_raw_rows": 2010000,
+    "estimated_episodes": 10000,
+    "environment": {"env_name": "swm/OGBCube-v0", "env_type": "single"}
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "pusht": {
+    "report": "artifacts/p2-fresh-pusht-v2/runs/fresh-validation/report.json",
+    "sha256": "4f212d416e145b27c0094c62f8d6dd5e261fbd116648a43caa0871505c3278a3"
+  },
+  "cube": {
+    "report": "artifacts/evaluation/cube/p2/runs/lr-calibration-lr0.0001/report.json",
+    "sha256": "a5d93d9f8fcab364f044e4a0265a0faa5e45a54c4dddcadae48f79156cd05a39"
+  },
+  "reacher": {
+    "report": "artifacts/evaluation/reacher-checkerboard/p2/runs/lr-calibration-lr0.0001/report.json",
+    "sha256": "2a051d2755e528c3a48df7fa0fa327d6e69ec6fa3a78cf20821e612dfb882b8f"
+  },
+  "tworooms": {
+    "report": "artifacts/evaluation/tworooms/p2/runs/lr-calibration-lr0.0001/report.json",
+    "sha256": "ff891a9fcf6bcfa325e3870f26b5158f789f36035877145ba0ac6d5a39a5a299"
+  }
+}

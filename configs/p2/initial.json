@@ -1,0 +1,7 @@
+{
+  "extends": "base.json",
+  "experiment_dir": "artifacts/p25-v64-t150-q4",
+  "adaptation": {
+    "updates": 1
+  }
+}

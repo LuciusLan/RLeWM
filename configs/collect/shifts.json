@@ -1,0 +1,10 @@
+{
+  "extends": "default.json",
+  "output_dir": "/opt/dlami/nvme/ubuntu/lewm_fresh/pusht-shifts-v2",
+  "regimes": {
+    "source": {},
+    "shape-I": {"geometry": {"block_shape": "I"}},
+    "red-agent": {"visual": {"agent_color": [255, 0, 0]}},
+    "heavy-block": {"dynamics": {"block_mass_scale": 2.0}}
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "dataset_id": "cube",
+  "p1_config": "codes/configs/p1/cube.json",
+  "collection_config": "codes/configs/collect/cube.json",
+  "experiment_root": "artifacts/evaluation/cube",
+  "raw_action_low": [-1, -1, -1, -1, -1],
+  "raw_action_high": [1, 1, 1, 1, 1]
+}

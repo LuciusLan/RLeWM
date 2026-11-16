@@ -1,0 +1,31 @@
+{
+  "extends": "proposal-base.json",
+  "comparison": "interleaved-planning",
+  "experiment_dir": "artifacts/evaluation/pusht/p3-interleave",
+  "query_dataset": {
+    "collection_config": "codes/configs/collect/default.json",
+    "regime": "source",
+    "batch_size": 128
+  },
+  "adaptation": {"methods": ["frozen", "fr-fixed"]},
+  "reuse": {},
+  "interleave": {
+    "arms": ["baseline", "rca", "proposals", "combined"],
+    "checkpoints": [2],
+    "references": 8,
+    "reference_source": "elite",
+    "adaptation_depths": [0, 1, 2, 3, 4],
+    "support_pairs": null,
+    "support_method": "fr-fixed",
+    "continuation_depths": [1, 2, 3, 4],
+    "continuation_context": "imagined",
+    "fragments_per_pair": 1,
+    "injection_slots": 64,
+    "noise_std": 0.1,
+    "goal_weight": 0,
+    "initial_source": "gaussian",
+    "replay": {"policy": "current", "capacity": 128, "fraction": 0.5},
+    "dataset_learning_rates": {"pusht": 0.00005, "tworooms": 0.0001, "reacher": 0.0001, "cube": 0.0001},
+    "dataset_seeds": {"pusht": [42, 43, 44], "tworooms": [41, 42, 43], "reacher": [41, 42, 43], "cube": [41, 42, 43]}
+  }
+}

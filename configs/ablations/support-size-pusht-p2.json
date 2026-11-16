@@ -1,0 +1,13 @@
+{
+  "dataset": "pusht",
+  "stage": "p2",
+  "reference_report": "artifacts/p2-fresh-pusht-v2/runs/fresh-validation/report.json",
+  "reference_report_sha256": "4f212d416e145b27c0094c62f8d6dd5e261fbd116648a43caa0871505c3278a3",
+  "experiment_dir": "artifacts/p2-support-size-fresh-pusht-v2",
+  "support_sizes": [16, 32, 64, 128],
+  "reference_size": 32,
+  "schedule": "temporal-u1",
+  "methods": ["frozen", "uniform", "forward", "reverse", "fr-fixed"],
+  "seeds": [42, 43, 44],
+  "learning_rate": 0.00005
+}

@@ -1,0 +1,41 @@
+{
+  "p1_config": "codes/configs/p1/default.json",
+  "scopes": [
+    "last-block"
+  ],
+  "adaptation": {
+    "updates": 1,
+    "learning_rate": 0.00005,
+    "support_size": 32,
+    "alpha": 0.5
+  },
+  "query_selection": {
+    "windows_per_episode": 4,
+    "seed": 20261019
+  },
+  "planning": {
+    "horizon": 5,
+    "population": 256,
+    "iterations": 6,
+    "elites": 32,
+    "initial_std": 1,
+    "minimum_std": 0,
+    "scoring_batch_size": 64,
+    "provisional_actions": 8,
+    "support_scan_limit": 2048,
+    "raw_action_low": [
+      -1,
+      -1
+    ],
+    "raw_action_high": [
+      1,
+      1
+    ]
+  },
+  "evaluation": {
+    "records": "compact",
+    "bootstrap_samples": 1000,
+    "log_every": 8,
+    "query_limit": null
+  }
+}

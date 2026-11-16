@@ -1,0 +1,13 @@
+{
+  "extends": "proposal-base.json",
+  "comparison": "factorial",
+  "experiment_dir": "artifacts/p3-fresh-pusht-v2",
+  "query_dataset": {
+    "collection_config": "codes/configs/collect/default.json",
+    "regime": "source",
+    "batch_size": 128
+  },
+  "adaptation": {"methods": ["frozen", "uniform", "fr-fixed"]},
+  "proposals": {"sources": ["gaussian", "context-fragments"]},
+  "reuse": {}
+}

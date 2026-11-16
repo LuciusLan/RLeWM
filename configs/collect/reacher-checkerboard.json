@@ -1,0 +1,11 @@
+{
+  "extends": "reacher.json",
+  "output_dir": "/home/ubuntu/project/datasets/fresh_data/reacher-checkerboard",
+  "rendering": {
+    "floor": "checkerboard",
+    "rgb1": [0.1, 0.2, 0.3],
+    "rgb2": [0.2, 0.3, 0.4],
+    "texrepeat": [1.0, 1.0],
+    "texuniform": false
+  }
+}

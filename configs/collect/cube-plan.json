@@ -1,0 +1,17 @@
+{
+  "extends": "native-base.json",
+  "backend": "cube",
+  "seed": 20261114,
+  "output_dir": "/home/ubuntu/project/datasets/fresh_data/cube-plan-mj36",
+  "reference_dataset": "/home/ubuntu/project/artifacts/preprocessing/cube/source.h5",
+  "expected_physics": {"mujoco": "3.6.0", "dm-control": "1.0.38"},
+  "policy": {
+    "name": "native-plan-oracle",
+    "noise": 0.1,
+    "noise_smoothing": 0.5,
+    "segment_dt": 0.4
+  },
+  "goal_protocols": {
+    "lewm-paper": {"goal_offset_steps": 25, "eval_budget": 50, "source": "le-wm/config/eval/cube.yaml"}
+  }
+}

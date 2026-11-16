@@ -1,0 +1,55 @@
+{
+  "paths": {
+    "repo": "/home/ubuntu/project/le-wm"
+  },
+  "data": {
+    "memory_only": true,
+    "history": 3,
+    "frameskip": 5,
+    "memory_windows": "all",
+    "validation_episodes": 0,
+    "test_episodes": 0,
+    "windows_per_query_episode": 4,
+    "split_seed": 20261106,
+    "historical_inspected_episodes": [],
+    "inspected_reports": [],
+    "inspected_report_globs": [],
+    "split_from": null
+  },
+  "adaptation": {
+    "methods": ["frozen", "uniform", "forward", "reverse", "fr-fixed", "fr-refresh", "rank-consensus"],
+    "support_size": 32,
+    "updates": 1,
+    "learning_rate": 0.00005,
+    "clip_norm": 1,
+    "alpha": 0.5,
+    "anchor_weight": 0
+  },
+  "retrieval": {
+    "backend": "cuvs",
+    "pool_size": 32,
+    "diagnostic_topk": 32,
+    "diagnostic_selection": "raw",
+    "calibration_pairs": 4096,
+    "chunk_size": 4096,
+    "beta_action": 1,
+    "beta_successor": 1,
+    "distance_floor": 1e-12,
+    "max_windows_per_episode": 4,
+    "min_start_step_gap": 20,
+    "initial_search_k": 256,
+    "max_search_k": 2048,
+    "index_batch_rows": 8192,
+    "index_checkpoint_rows": 131072,
+    "device_reserve_gib": 2
+  },
+  "evaluation": {
+    "seeds": [42, 43, 44],
+    "bootstrap_samples": 1000,
+    "harm_tolerance": 1e-8,
+    "accurate_quantile": 0.25,
+    "log_every": 16
+  },
+  "cache": {"checkpoint_rows": 8192},
+  "preprocessing": {"raw_action_dim": 2}
+}

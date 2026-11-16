@@ -1,0 +1,8 @@
+{
+  "extends": "fresh.json",
+  "comparison": "proposal-only",
+  "experiment_dir": "artifacts/p3-proposal-ablations-fresh-pusht-v2",
+  "adaptation": {"methods": ["frozen"]},
+  "proposals": {"sources": ["gaussian", "uniform-fragments", "context-fragments"]},
+  "reuse": {}
+}

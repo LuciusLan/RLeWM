@@ -1,0 +1,10 @@
+{
+  "extends": "default.json",
+  "experiment_dir": "artifacts/p2-fresh-pusht-v2",
+  "query_dataset": {
+    "collection_config": "codes/configs/collect/default.json",
+    "regime": "source",
+    "batch_size": 128
+  },
+  "schedule_names": ["initial-u1", "initial-u5-1e-5", "temporal-u1", "temporal-u1-reset"]
+}

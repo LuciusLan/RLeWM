@@ -14,8 +14,11 @@ from .runtime import object_hash, read_json, write_json
 
 
 def inspect_source(path: Path) -> tuple[dict, np.ndarray, np.ndarray, np.ndarray]:
+    from .preprocessing.hdf5 import metadata_columns, view_record
     path = Path(path).resolve(strict=True)
     with h5py.File(path, "r", swmr=True) as source:
+        view = view_record(source)
+        columns = metadata_columns(source)
         lengths = source["ep_len"][:].astype(np.int64)
         offsets = source["ep_offset"][:].astype(np.int64)
         rows = source["pixels"].shape[0]
@@ -23,18 +26,26 @@ def inspect_source(path: Path) -> tuple[dict, np.ndarray, np.ndarray, np.ndarray
             raise ValueError("Invalid episode metadata")
         if not np.array_equal(offsets, np.cumsum(np.r_[0, lengths[:-1]])) or int(lengths.sum()) != rows:
             raise ValueError("Episodes must partition the source rows contiguously")
-        if any(source[name].shape[0] != rows for name in ("action", "episode_idx", "step_idx")):
+        if any(source[name].shape[0] != rows for name in ("action", *columns.values())):
             raise ValueError("Source columns have inconsistent row counts")
-        episode_ids = source["episode_idx"][offsets.tolist()]
+        for name in columns.values():
+            if source[name].shape != (rows,) or not np.issubdtype(source[name].dtype, np.integer):
+                raise ValueError(f"{name} must be a one-dimensional integer column")
+        episode_ids = source[columns["episode_idx"]][offsets.tolist()]
         if len(set(episode_ids.tolist())) != len(episode_ids):
             raise ValueError("Source episode IDs must be unique")
-        schema = {name: {"shape": list(source[name].shape), "dtype": str(source[name].dtype)}
+        schema = {name: {"shape": list(source[columns.get(name, name)].shape),
+                         "dtype": str(source[columns.get(name, name)].dtype)}
                   for name in ("pixels", "action", "episode_idx", "step_idx")}
     stat = path.stat()
     identity = {"path": str(path), "bytes": stat.st_size, "mtime_ns": stat.st_mtime_ns,
                 "schema": schema, "episodes": len(lengths), "rows": rows,
                 "metadata_sha256": object_hash([lengths.tolist(), offsets.tolist(), episode_ids.tolist()]),
                 "checksum_scope": "episode metadata, schema, file size and mtime; not full image payload"}
+    if any(canonical != actual for canonical, actual in columns.items()):
+        identity["metadata_columns"] = columns
+    if view is not None:
+        identity["source_view"] = view
     return identity, lengths, offsets, episode_ids
 
 
@@ -95,7 +106,7 @@ def get_manifest(config: dict) -> dict:
     def item(ep: int, start: int) -> dict:
         raw_start = int(offsets[ep]) + start
         frames = list(range(raw_start, raw_start + span, data["frameskip"]))
-        return {"transition_id": f"pusht:{int(episode_ids[ep])}:{start}",
+        return {"transition_id": f"{data.get('dataset_id', 'pusht')}:{int(episode_ids[ep])}:{start}",
                 "source_episode_position": ep, "episode_id": int(episode_ids[ep]),
                 "start_in_episode": start, "raw_observation_rows": frames,
                 "candidate_action_rows": list(range(frames[-2], frames[-1])),
@@ -190,7 +201,9 @@ def _full_manifest(config, source, lengths, offsets, episode_ids, inspected, pat
         "evaluation_windows": evaluation_windows,
         "split_origin": {"path": str(parent_path), "fingerprint": parent["fingerprint"]} if parent else None,
         "excluded_inspected_query_episodes": sorted(inspected),
-        "checkpoint_overlap": "unknown; adaptation holdout is not a pretraining holdout"}
+        "checkpoint_overlap": ("released pretraining corpus used as retrieval memory only; independent query episodes required"
+                               if data.get("memory_only") else
+                               "unknown; adaptation holdout is not a pretraining holdout")}
     manifest["fingerprint"] = object_hash(manifest)
     write_json(path, manifest)
     return manifest
@@ -201,18 +214,27 @@ def action_statistics(manifest: dict) -> dict:
     with h5py.File(manifest["source"]["path"], "r", swmr=True) as source:
         lengths, offsets = source["ep_len"][:], source["ep_offset"][:]
         action = source["action"][:]
+        valid = source["action_valid"][:] if "action_valid" in source else None
+    if valid is not None and (valid.shape != (len(action),) or valid.dtype != np.bool_):
+        raise ValueError("action_valid must be a one-dimensional boolean mask over raw action rows")
     mask = np.zeros(len(action), dtype=bool)
     for ep in manifest["episodes"]["memory"]:
         mask[int(offsets[ep]):int(offsets[ep] + lengths[ep])] = True
+    excluded = int((mask & ~valid).sum()) if valid is not None else 0
+    if valid is not None:
+        mask &= valid
     tensor = torch.from_numpy(action[mask])
     if len(tensor) < 2 or not torch.isfinite(tensor).all():
         raise ValueError("Action normalization requires finite memory actions")
     mean, std = tensor.mean(0), tensor.std(0, correction=1)
     if (std <= 0).any():
         raise ValueError("Degenerate memory action coordinates")
-    return {"mean": mean.tolist(), "std": std.tolist(), "raw_rows": len(tensor),
+    result = {"mean": mean.tolist(), "std": std.tolist(), "raw_rows": len(tensor),
             "std_correction": 1, "fit_split": "memory episodes only",
             "convention": "native ZScoreNormalizer before ordered action-block reshaping"}
+    if valid is not None:
+        result["excluded_terminal_action_rows"] = excluded
+    return result
 
 
 class WindowReader:

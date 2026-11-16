@@ -1,0 +1,30 @@
+{
+  "dataset": "pusht",
+  "stage": "p2",
+  "experiment_dir": "artifacts/p2-scope-fresh-pusht-moreLR",
+  "support_size": 32,
+  "schedule": "temporal-u1",
+  "methods": ["frozen", "uniform", "forward", "reverse", "fr-fixed"],
+  "scopes": ["last-block", "predictor"],
+  "available_scopes": ["last-block", "predictor", "predictor-action"],
+  "learning_rates": [0.000001,0.000005, 0.00001, 0.00005, 0.0001],
+  "default_learning_rates": [0.000001,0.0001],
+  "seeds": [42, 43, 44],
+  "references": [
+    {
+      "learning_rate": 0.00005,
+      "report": "artifacts/p2-fresh-pusht-v2/runs/fresh-validation/report.json",
+      "sha256": "4f212d416e145b27c0094c62f8d6dd5e261fbd116648a43caa0871505c3278a3"
+    },
+    {
+      "learning_rate": 0.000005,
+      "report": "artifacts/p2-fresh-pusht-v2/runs/temporal-sweep-lr5e-06/report.json",
+      "sha256": "94eae3c2f30583f01be88af9ba71b494ad03e9924ae77aa96b83779cdb73824d"
+    },
+    {
+      "learning_rate": 0.00001,
+      "report": "artifacts/p2-fresh-pusht-v2/runs/temporal-sweep-lr1e-05/report.json",
+      "sha256": "1327fd00b17d1e9a2b3141ff42d6ef851a46f27ecb8b0d5ccc99e6fdd03fc53d"
+    }
+  ]
+}

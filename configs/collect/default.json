@@ -1,0 +1,30 @@
+{
+  "backend": "pusht",
+  "output_dir": "/home/ubuntu/project/datasets/fresh_data/pusht",
+  "reference_dataset": "/opt/dlami/nvme/ubuntu/lewm_pusht/pusht_expert_train.h5",
+  "seed": 20261103,
+  "splits": {"validation": 64, "test": 100},
+  "raw_steps": 200,
+  "history": 3,
+  "frameskip": 5,
+  "image_size": 224,
+  "goal_offset_steps": 25,
+  "windows_per_episode": 4,
+  "policy": {
+    "name": "bounded-contact",
+    "max_action_norm": 0.35,
+    "push_distance": 15,
+    "safety_margin": 48
+  },
+  "quality": {
+    "coordinate_units": "native_scene_pixels",
+    "visibility_margin": 8,
+    "min_contact_steps": 1,
+    "min_block_translation": 5,
+    "min_block_rotation_degrees": 5,
+    "exclude_initial_success": true,
+    "max_attempts": 20
+  },
+  "compression": "gzip",
+  "regimes": {"source": {}}
+}
